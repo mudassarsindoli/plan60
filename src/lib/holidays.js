@@ -1,9 +1,9 @@
-import { daysInMonth, toKey, keyToYMD } from "./dates";
+import { daysInMonth, toKey, keyToYMD } from "./dates.js";
 
 /**
  * Holiday Master
  * ---------------
- * Manage statutory and company holidays here. Three layers:
+ * Three layers, resolved in order:
  *
  *  1. `HOLIDAYS` — explicit year-keyed entries (`"YYYY-MM-DD": "Name"`).
  *     Edit or extend this map for specific future years (e.g. movable lunar
@@ -13,15 +13,11 @@ import { daysInMonth, toKey, keyToYMD } from "./dates";
  *     repeat every year.
  *
  *  3. `STATE_HOLIDAYS` — state-wise holidays keyed by state id. Only holidays
- *     of the user's selected working state (`AppState.state`) are active.
- *     Movable festivals that follow the lunar calendar belong in `HOLIDAYS`
- *     per year, not here.
+ *     of the user's selected working state are active.
  *
- * Holidays are merged with user-marked holidays at runtime. They always take
- * precedence over WFO selection and are never counted toward the office-day
- * target.
+ * Holidays are never counted toward the office-day target.
  */
-export const HOLIDAYS: Record<string, string> = {
+export const HOLIDAYS = {
   "2025-08-15": "Independence Day",
   "2025-10-02": "Gandhi Jayanti",
   "2025-12-25": "Christmas",
@@ -35,31 +31,15 @@ export const HOLIDAYS: Record<string, string> = {
   "2027-08-15": "Independence Day",
 };
 
-export type HolidayScope = "national" | "state";
-
-export interface RecurringHoliday {
-  month: number; // 1-12
-  day: number; // 1-31
-  name: string;
-  scope?: HolidayScope; // defaults to "national"
-}
-
-export const RECURRING_HOLIDAYS: RecurringHoliday[] = [
+export const RECURRING_HOLIDAYS = [
   { month: 1, day: 26, name: "Republic Day" },
   { month: 8, day: 15, name: "Independence Day" },
   { month: 10, day: 2, name: "Gandhi Jayanti" },
   { month: 12, day: 25, name: "Christmas" },
 ];
 
-export type StateId = string;
-
-export interface HolidayState {
-  id: StateId;
-  name: string;
-}
-
 /** Pickable "working state" regions — controls which state holidays apply. */
-export const HOLIDAY_STATES: HolidayState[] = [
+export const HOLIDAY_STATES = [
   { id: "andhra-pradesh", name: "Andhra Pradesh" },
   { id: "arunachal-pradesh", name: "Arunachal Pradesh" },
   { id: "assam", name: "Assam" },
@@ -99,12 +79,10 @@ export const HOLIDAY_STATES: HolidayState[] = [
 ];
 
 /**
- * State-wise holidays (curated fixed-date master). Add or extend per state —
- * e.g. Karnataka's Kannada Rajyotsava on Nov 1 is only a holiday for
- * employees working in Karnataka. Lunar/movable festivals belong in `HOLIDAYS`
- * per year instead.
+ * State-wise holidays (curated fixed-date master). Movable/lunar festivals
+ * belong in `HOLIDAYS` per year, not here.
  */
-export const STATE_HOLIDAYS: Record<StateId, RecurringHoliday[]> = {
+export const STATE_HOLIDAYS = {
   "andhra-pradesh": [
     { month: 1, day: 14, name: "Makar Sankranti" },
     { month: 4, day: 14, name: "Dr. Ambedkar Jayanti" },
@@ -198,126 +176,40 @@ export const STATE_HOLIDAYS: Record<StateId, RecurringHoliday[]> = {
   puducherry: [{ month: 1, day: 14, name: "Pongal" }],
 };
 
-export function isKnownState(id: string): boolean {
+export function isKnownState(id) {
   return Object.prototype.hasOwnProperty.call(STATE_HOLIDAYS, id);
 }
 
-export function stateHolidaysFor(state: StateId): RecurringHoliday[] {
+function stateHolidaysFor(state) {
   return STATE_HOLIDAYS[state] ?? [];
 }
 
-/** User-marked holidays: date key -> label. Used as an override layer. */
-export type ManualHolidays = Record<string, string>;
-
-export function isManualHoliday(key: string, manual: ManualHolidays): boolean {
-  return Object.prototype.hasOwnProperty.call(manual, key);
-}
-
-/** Resolved holiday with its origin scope (manual / national / state). */
-export interface HolidayDetails {
-  name: string;
-  scope: HolidayScope;
-}
-
-/**
- * Resolve the details of a date from manual, national master, then the
- * selected working state's holidays.
- */
-export function getHolidayDetails(
-  key: string,
-  manual: ManualHolidays = {},
-  state?: StateId | null,
-): HolidayDetails | null {
-  if (isManualHoliday(key, manual)) return { name: manual[key], scope: "national" };
+/** Resolve `{ name, scope }` for a date: national master → recurring → state. */
+export function getHolidayDetails(key, state) {
   if (Object.prototype.hasOwnProperty.call(HOLIDAYS, key)) {
     return { name: HOLIDAYS[key], scope: "national" };
   }
   const p = keyToYMD(key);
   if (!p) return null;
-  const md = { month: p.month + 1, day: p.day };
-  const rec = RECURRING_HOLIDAYS.find(
-    (r) => r.month === md.month && r.day === md.day,
-  );
-  if (rec) return { name: rec.name, scope: rec.scope ?? "national" };
+  const month = p.month + 1;
+  const day = p.day;
+  const rec = RECURRING_HOLIDAYS.find((r) => r.month === month && r.day === day);
+  if (rec) return { name: rec.name, scope: "national" };
   if (state) {
-    const st = stateHolidaysFor(state).find(
-      (r) => r.month === md.month && r.day === md.day,
-    );
+    const st = stateHolidaysFor(state).find((r) => r.month === month && r.day === day);
     if (st) return { name: st.name, scope: "state" };
   }
   return null;
 }
 
-/** Resolve the holiday name for a key from manual, master, then state lists. */
-export function getHolidayName(
-  key: string,
-  manual: ManualHolidays = {},
-  state?: StateId | null,
-): string | null {
-  return getHolidayDetails(key, manual, state)?.name ?? null;
-}
-
-/**
- * All holidays for a month as `{ "YYYY-MM-DD": "Name" }`, including national
- * statutory entries, the selected state's holidays, and user-marked overrides.
- */
-export function getMonthHolidays(
-  year: number,
-  month: number,
-  manual: ManualHolidays = {},
-  state?: StateId | null,
-): Record<string, string> {
-  const result: Record<string, string> = {};
+/** All holidays for a month as `{ "YYYY-MM-DD": "Name" }`. */
+export function getMonthHolidays(year, month, state) {
+  const result = {};
   const total = daysInMonth(year, month);
   for (let day = 1; day <= total; day++) {
     const key = toKey(year, month, day);
-    const details = getHolidayDetails(key, manual, state);
+    const details = getHolidayDetails(key, state);
     if (details) result[key] = details.name;
-  }
-  return result;
-}
-
-/** Origin scope for each holiday in a month ("national" vs "state"). */
-export function getMonthHolidayScopes(
-  year: number,
-  month: number,
-  manual: ManualHolidays = {},
-  state?: StateId | null,
-): Record<string, HolidayScope> {
-  const result: Record<string, HolidayScope> = {};
-  const total = daysInMonth(year, month);
-  for (let day = 1; day <= total; day++) {
-    const key = toKey(year, month, day);
-    const details = getHolidayDetails(key, manual, state);
-    if (details) result[key] = details.scope;
-  }
-  return result;
-}
-
-/**
- * Combined holiday lookup for a range of months (used by the optimizer so the
- * window spans current and adjacent months).
- */
-export function getHolidaysForMonths(
-  months: { year: number; month: number }[],
-  manual: ManualHolidays = {},
-  state?: StateId | null,
-): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const { year, month } of months) {
-    Object.assign(result, getMonthHolidays(year, month, manual, state));
-  }
-  return result;
-}
-
-/** Join two manual-holiday sources (e.g. seed + saved), saved winning on clash. */
-export function mergeManualHolidays(...sources: ManualHolidays[]): ManualHolidays {
-  const result: ManualHolidays = {};
-  for (const source of sources) {
-    for (const [key, name] of Object.entries(source)) {
-      if (name) result[key] = name;
-      else delete result[key];
-    }
   }
   return result;
 }

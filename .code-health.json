@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "excludePatterns": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/dist/**"
+  ],
+  "includePatterns": [
+    "**"
+  ],
+  "rules": [
+    {
+      "id": "no-eval",
+      "enabled": true,
+      "type": "regex",
+      "severity": "critical",
+      "message": "eval() is forbidden - arbitrary code execution risk",
+      "description": "eval() executes arbitrary code passed as a string.",
+      "impact": "Remote code execution, data theft",
+      "fix": "Replace eval() with a safe alternative such as JSON.parse().",
+      "pattern": "eval\\s*\\(",
+      "flags": "g"
+    },
+    {
+      "id": "react-components-pascalcase",
+      "enabled": true,
+      "type": "naming",
+      "severity": "medium",
+      "message": "React component files must use PascalCase (e.g., Button.tsx).",
+      "naming": {
+        "style": "PascalCase",
+        "appliesTo": "files"
+      },
+      "filePattern": [
+        "src/components/**/*.jsx"
+      ]
+    }
+  ],
+  "scoring": {
+    "weights": {
+      "critical": 25,
+      "high": 7,
+      "medium": 3,
+      "low": 1,
+      "info": 0
+    }
+  }
+}
