@@ -78,6 +78,46 @@ export const HOLIDAY_STATES = [
   { id: "puducherry", name: "Puducherry" },
 ];
 
+/** Short codes shown on state-wise holiday cells. */
+export const STATE_CODES = {
+  "andhra-pradesh": "AP",
+  "arunachal-pradesh": "AR",
+  assam: "AS",
+  bihar: "BR",
+  chhattisgarh: "CG",
+  goa: "GA",
+  gujarat: "GJ",
+  haryana: "HR",
+  "himachal-pradesh": "HP",
+  jharkhand: "JH",
+  karnataka: "KA",
+  kerala: "KL",
+  "madhya-pradesh": "MP",
+  maharashtra: "MH",
+  manipur: "MN",
+  meghalaya: "ML",
+  mizoram: "MZ",
+  nagaland: "NL",
+  odisha: "OD",
+  punjab: "PB",
+  rajasthan: "RJ",
+  sikkim: "SK",
+  "tamil-nadu": "TN",
+  telangana: "TG",
+  tripura: "TR",
+  "uttar-pradesh": "UP",
+  uttarakhand: "UK",
+  "west-bengal": "WB",
+  "andaman-nicobar": "AN",
+  chandigarh: "CH",
+  "dadra-nagar-haveli": "DN",
+  delhi: "DL",
+  "jammu-kashmir": "JK",
+  ladakh: "LA",
+  lakshadweep: "LD",
+  puducherry: "PY",
+};
+
 /**
  * State-wise holidays (curated fixed-date master). Movable/lunar festivals
  * belong in `HOLIDAYS` per year, not here.
@@ -202,14 +242,23 @@ export function getHolidayDetails(key, state) {
   return null;
 }
 
-/** All holidays for a month as `{ "YYYY-MM-DD": "Name" }`. */
+/**
+ * All holidays for a month as `{ "YYYY-MM-DD": { name, scope, code } }`.
+ * `code` is the state's short code, set only for state-scoped holidays.
+ */
 export function getMonthHolidays(year, month, state) {
   const result = {};
   const total = daysInMonth(year, month);
   for (let day = 1; day <= total; day++) {
     const key = toKey(year, month, day);
     const details = getHolidayDetails(key, state);
-    if (details) result[key] = details.name;
+    if (details) {
+      result[key] = {
+        name: details.name,
+        scope: details.scope,
+        code: details.scope === "state" ? STATE_CODES[state] : undefined,
+      };
+    }
   }
   return result;
 }

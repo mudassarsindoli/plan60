@@ -1,25 +1,28 @@
 /**
  * Required office (WFO) presence per month: 60% of the effective working
- * days. Per the Capgemini India WFO mandate — "swipe 60% of your working
- * days" — effective days are the month's working weekdays minus holidays
- * minus planned leaves. "12 days" is just the 20-working-day-month case
- * (20 × 60%); a 21- or 22-working-day month requires 13 or 14, and taking
- * 2 leaves in a 20-working-day month drops the target to 11 (18 × 60%).
- * Rounded up, never above the month's effective working days.
+ * days, per the Capgemini India WFO mandate — "swipe 60% of your working
+ * days". Effective days are the month's working weekdays minus holidays
+ * minus marked leave days (both already excluded from `workingDays` by the
+ * caller). Rounded down (e.g. 11.4 effective days needs only 11), never
+ * above the month's effective working days, and never above the mandate's
+ * monthly cap of 12 days regardless of how many effective working days the
+ * month has.
  */
 export const WFO_PERCENT = 0.6;
+export const MAX_OFFICE_DAYS_PER_MONTH = 12;
 
-export function officeTargetForMonth(workingDays, leaves) {
+export function officeTargetForMonth(workingDays) {
   if (workingDays <= 0) return 0;
-  const leavesClamped = Math.min(workingDays, Math.max(0, leaves));
-  const effective = workingDays - leavesClamped;
-  if (effective <= 0) return 0;
-  return Math.min(effective, Math.ceil(WFO_PERCENT * effective));
+  return Math.min(
+    workingDays,
+    Math.floor(WFO_PERCENT * workingDays),
+    MAX_OFFICE_DAYS_PER_MONTH,
+  );
 }
 
 /** Count WFO days on eligible (working) days vs non-eligible days. */
 export function countWfoForMonth(wfoDates, workingKeys, target = null) {
-  if (target === null) target = officeTargetForMonth(workingKeys.size, 0);
+  if (target === null) target = officeTargetForMonth(workingKeys.size);
   let used = 0;
   let invalid = 0;
   for (const key of wfoDates) {
@@ -52,7 +55,9 @@ export function longestWfhRun(days) {
       run = 0;
     }
   }
-  return best > 0 ? { length: best, from: bestFrom, to: bestTo } : { length: 0 };
+  return best > 0
+    ? { length: best, from: bestFrom, to: bestTo }
+    : { length: 0 };
 }
 
 /** All maximal continuous WFH blocks, longest first. */

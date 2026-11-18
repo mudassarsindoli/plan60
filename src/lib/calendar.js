@@ -5,7 +5,7 @@ export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /**
  * Build the 6x7 grid for a month, Monday-first, with adjacent-month fillers.
- * `holidayMap` is `{ "YYYY-MM-DD": "Name" }`.
+ * `holidayMap` is `{ "YYYY-MM-DD": { name, scope, code } }`.
  */
 export function buildMonthGrid(year, month, holidayMap) {
   const firstDow = new Date(year, month, 1).getDay(); // 0 = Sunday
@@ -34,7 +34,8 @@ export function buildMonthGrid(year, month, holidayMap) {
       day: dd,
       inMonth,
       kind: isHoliday ? "holiday" : weekendDay ? "weekend" : "working",
-      holidayName: holiday,
+      holidayName: holiday?.name,
+      holidayCode: holiday?.code,
       isWorkingDay: !isHoliday && !weekendDay,
     });
   }
